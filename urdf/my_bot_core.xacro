@@ -53,7 +53,7 @@
     <material>Gazebo/White</material>
   </gazebo>
 
-<!-- Steering Wheel -->
+  <!-- Steering Wheel -->
 
   <link name="steering_wheel_link">
 
@@ -103,6 +103,17 @@
       <origin rpy="0 0 0" xyz="0 0 0" />
       <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001" />
     </inertial>
+    <visual>
+
+      <origin rpy="0 0 0" xyz="0 0 0" />
+
+      <geometry>
+        <cylinder radius="0.1" length="0.02" />
+      </geometry>
+
+      <material name="Black" />
+
+    </visual>
   </link>
 
   <link name="front_right_steering">
@@ -111,6 +122,17 @@
       <origin rpy="0 0 0" xyz="0 0 0" />
       <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001" />
     </inertial>
+    <visual>
+
+      <origin rpy="0 0 0" xyz="0 0 0" />
+
+      <geometry>
+        <cylinder radius="0.1" length="0.02" />
+      </geometry>
+
+      <material name="Black" />
+
+    </visual>
   </link>
 
   <joint name="front_left_steering_joint" type="revolute">
@@ -125,7 +147,7 @@
     <parent link="chassis" />
     <child link="front_right_steering" />
     <origin rpy="0 0 0" xyz="0.4533 -0.46 -0.15" />
-    <axis xyz="0 0 1" />
+    <axis xyz="0 0 -1" />
     <limit effort="100" velocity="10" lower="-0.5" upper="0.5" />
     <mimic joint="front_left_steering_joint" multiplier="-1" offset="0" />
   </joint>
@@ -227,7 +249,8 @@
       <origin rpy="1.5708 0 0" xyz="0 0 0" />
       <geometry>
         <cylinder length="0.12" radius="0.22" />
-      </geometry> <material name="Black" />
+      </geometry>
+      <material name="Black" />
     </visual>
     <collision>
       <origin rpy="1.5708 0 0" xyz="0 0 0" />
