@@ -40,7 +40,7 @@
 
   <joint name="lidar_joint" type="fixed">
 
-    <parent link="chassis" />
+    <parent link="chassis_link" />
 
     <child link="lidar" />
 
