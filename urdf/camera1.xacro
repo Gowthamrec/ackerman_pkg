@@ -57,12 +57,12 @@
 
     <child link="camera_optical" />
 
-    <origin rpy="-1.5708 0 -1.5708" xyz="0 0 0" />
+    <origin rpy="0 0 0" xyz="0 0 0" />
 
   </joint>
 
 
-  <gazebo reference="camera_link">
+  <gazebo reference="camera_optical">
     <material>Gazebo/Red</material>
 
     <sensor name="camera" type="camera">
@@ -82,7 +82,7 @@
         </clip>
       </camera>
       <plugin name="camera_controller" filename="libgazebo_ros_camera.so">
-        <frame_name>camera_link_optical</frame_name>
+        <frame_name>camera_optical</frame_name>
       </plugin>
     </sensor>
   </gazebo>

@@ -12,20 +12,35 @@
     <xacro:property name="wheel_mass" value="3.0" />
     <xacro:property name="steering_mass" value="0.01" />
 
+    <material name="white">
+        <color rgba="1 1 1 1" />
+    </material>
+
+    <material name="orange">
+        <color rgba="1 0.3 0.1 1"/>
+    </material>
+
+    <material name="blue">
+        <color rgba="0.2 0.2 1 1"/>
+    </material>
+
+    <material name="black">
+        <color rgba="0 0 0 1"/>
+    </material>
+
 
     <!-- BASE -->
-    <link name="base_footprint">
-            <origin xyz="0 0 0" rpy="0 0 0" />
-    </link>
-
     <link name="base_link">
     </link>
-    <joint name="base_joint" type="fixed">
-        <parent link="base_footprint" />
-        <child link="base_link" />
-        <origin xyz="0.0 0.0 0.0" rpy="0 0 0" />
-    </joint>
 
+    <joint name="base_joint" type="fixed">
+        <parent link="base_link" />
+        <child link="base_footprint" />
+        <origin xyz="0 0 0" rpy="0 0 0" />
+    </joint>
+    
+    <link name="base_footprint">
+    </link>
     <link name="chassis_link">
         <inertial>
             <origin xyz="0.0374140021041951 -0.000373005187591258 -0.0771282894414029" rpy="0 0 0" />
@@ -40,6 +55,7 @@
             <geometry>
                 <box size="1.2 0.8 0.3" />
             </geometry>
+            <material name="white"/>
         </visual>
         <collision>
             <origin xyz="0.07 0 -0.05" rpy="0 0 0" />
