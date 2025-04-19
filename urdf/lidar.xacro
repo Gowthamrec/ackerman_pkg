@@ -40,11 +40,11 @@
 
   <joint name="lidar_joint" type="fixed">
 
-    <parent link="chassis_link" />
+    <parent link="base_link" />
 
     <child link="lidar" />
 
-    <origin rpy="0 0 0" xyz="0 0 0.19" />
+    <origin rpy="0 0 0" xyz="0 0 0.3455" />
 
   </joint>
 
