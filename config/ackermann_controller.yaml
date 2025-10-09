@@ -1,0 +1,40 @@
+# ackermann_controller.yaml
+
+AckermannController:
+  ros__parameters:
+    type: "ackermann"
+    use_sim_time: true
+    # Controller frequency in Hz
+    control_frequency: 20.0
+
+    # Robot geometry
+    wheel_base: 0.906   # distance between front and rear axle (m)
+    min_turning_radius: 0.7   # minimum turning radius (m)
+
+    # Velocity limits
+    max_steering_angle: 0.6    # rad, matches front steering joints limit
+    max_accel: 1.5             # m/s^2
+    max_speed: 2.0             # m/s
+    min_speed: 0.0             # m/s
+
+    # Tolerances
+    xy_goal_tolerance: 0.05    # m
+    yaw_goal_tolerance: 0.05   # rad
+    latch_xy_goal_tolerance: true
+
+    # Lookahead distance for pure pursuit
+    lookahead_distance: 0.7    # m
+
+    # PID for speed control (optional tuning)
+    speed_pid:
+      p: 1.0
+      i: 0.0
+      d: 0.1
+      i_clamp: 0.5
+
+    # Optional: steering PID if needed
+    steering_pid:
+      p: 5.0
+      i: 0.0
+      d: 0.1
+      i_clamp: 0.5
