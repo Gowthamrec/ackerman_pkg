@@ -1,0 +1,56 @@
+# Vision System Configuration for Gazebo Simulation
+
+# Object Detection Parameters
+object_detection:
+  camera_topic: /camera/image_raw
+  model_path: yolov8n.pt  # nano model for faster inference
+  confidence_threshold: 0.5
+  enable_visualization: true
+  iou_threshold: 0.45
+  
+  # YOLO model classes to detect
+  classes_of_interest:
+    - person
+    - car
+    - truck
+    - bicycle
+    - stop sign
+    - traffic light
+
+# Lane Detection Parameters  
+lane_detection:
+  camera_topic: /camera/image_raw
+  enable_visualization: true
+  
+  # Color range for lane detection (HSV)
+  # White lanes
+  lower_hsv: [0, 0, 200]
+  upper_hsv: [180, 30, 255]
+  
+  # Morphological operations
+  kernel_size: 5
+  min_contour_area: 500
+
+# Visual Odometry Parameters
+visual_odometry:
+  camera_topic: /camera/image_raw
+  publish_tf: false  # Don't publish TF in simulation
+  
+  # Camera intrinsic matrix (adjust based on your camera)
+  camera_matrix:
+    - [500.0, 0.0, 320.0]
+    - [0.0, 500.0, 240.0]
+    - [0.0, 0.0, 1.0]
+  
+  # ORB feature detector parameters
+  nfeatures: 500
+  scale_factor: 1.2
+  nlevels: 8
+  
+  # Motion estimation
+  min_matches: 10
+  lowe_ratio: 0.75
+
+# ROS parameters
+ros:
+  use_sim_time: true

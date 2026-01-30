@@ -83,6 +83,10 @@
       </camera>
       <plugin name="camera_controller" filename="libgazebo_ros_camera.so">
         <frame_name>camera_optical</frame_name>
+        <camera_name>gazebo_camera</camera_name>
+        <image_topic_name>image_raw</image_topic_name>
+        <camera_info_topic_name>camera_info</camera_info_topic_name>
+        <camera_info_frame_name>camera_optical</camera_info_frame_name>
       </plugin>
     </sensor>
   </gazebo>

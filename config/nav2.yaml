@@ -136,15 +136,15 @@ controller_server:
       plugin: "nav2_controller::SimpleGoalChecker"
       xy_goal_tolerance: 0.1
       yaw_goal_tolerance: 0.05
-    # Regulated Pure Pursuit Controller for Ackermann Steering - FINAL TUNED
+    # Regulated Pure Pursuit Controller for Ackermann Steering - TUNED FOR FASTER NAVIGATION
     FollowPath:
       plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
-      desired_linear_vel: 0.1
-      max_vel_linear_x: 0.15
-      lookahead_dist: 0.2
-      min_lookahead_dist: 0.1
-      max_lookahead_dist: 0.4
-      lookahead_time: 0.6
+      desired_linear_vel: 1.0
+      max_vel_linear_x: 2.0
+      lookahead_dist: 0.5
+      min_lookahead_dist: 0.2
+      max_lookahead_dist: 1.0
+      lookahead_time: 1.0
       use_rotate_to_heading: false
       rotate_to_heading_min_angle: 0.785
       transform_tolerance: 0.2
@@ -180,8 +180,8 @@ local_costmap:
       plugins: ["voxel_layer", "inflation_layer"]
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 3.0
-        inflation_radius: 0.55
+        cost_scaling_factor: 5.0
+        inflation_radius: 1.2
       voxel_layer:
         plugin: "nav2_costmap_2d::VoxelLayer"
         enabled: True
@@ -198,9 +198,9 @@ local_costmap:
           clearing: True
           marking: True
           data_type: "LaserScan"
-          raytrace_max_range: 3.0
+          raytrace_max_range: 5.0
           raytrace_min_range: 0.0
-          obstacle_max_range: 2.5
+          obstacle_max_range: 4.0
           obstacle_min_range: 0.0
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
@@ -229,17 +229,17 @@ global_costmap:
           clearing: True
           marking: True
           data_type: "LaserScan"
-          raytrace_max_range: 3.0
+          raytrace_max_range: 5.0
           raytrace_min_range: 0.0
-          obstacle_max_range: 2.5
+          obstacle_max_range: 4.0
           obstacle_min_range: 0.0
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
         map_subscribe_transient_local: True
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 3.0
-        inflation_radius: 0.55
+        cost_scaling_factor: 5.0
+        inflation_radius: 1.2
       always_send_full_costmap: True
 
 map_server:

@@ -31,8 +31,16 @@ def generate_launch_description():
                                         ],
                         output='screen')
 
+    # Include vision system
+    vision_gazebo = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([os.path.join(
+            get_package_share_directory(package_name), 'launch', 'vision_gazebo.launch.py'
+        )])
+    )
+
     return LaunchDescription([
         rsp,
         gazebo,
-        spawn_entity
+        spawn_entity,
+        vision_gazebo,
     ])

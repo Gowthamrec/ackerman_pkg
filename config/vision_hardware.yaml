@@ -1,0 +1,80 @@
+# Vision System Configuration for Real Hardware
+
+# Hardware Camera Parameters
+hardware:
+  camera_topic: /dev/video0      # USB camera device
+  frame_rate: 30                  # Real camera FPS
+  enable_visualization: true      # Show processed images
+  image_width: 640
+  image_height: 480
+
+# Object Detection Parameters
+object_detection:
+  camera_topic: /camera/image_raw
+  model_path: yolov8n.pt  # nano model for faster inference
+  confidence_threshold: 0.6       # Higher for real objects (0.5 for simulation)
+  enable_visualization: true
+  iou_threshold: 0.45
+  
+  # YOLO model classes to detect
+  classes_of_interest:
+    - person
+    - car
+    - truck
+    - bicycle
+    - stop sign
+    - traffic light
+    - pothole  # Add custom classes as needed
+
+# Lane Detection Parameters  
+lane_detection:
+  camera_topic: /camera/image_raw
+  enable_visualization: true
+  
+  # Color range for lane detection (HSV)
+  # Adjust these values based on your lane markings
+  lower_hsv: [0, 0, 200]
+  upper_hsv: [180, 30, 255]
+  
+  # Morphological operations
+  kernel_size: 5
+  min_contour_area: 500
+  
+  # Lane following
+  max_offset_tolerance: 0.3  # 30% of frame width
+
+# Visual Odometry Parameters
+visual_odometry:
+  camera_topic: /camera/image_raw
+  publish_tf: true  # Publish TF for real hardware
+  
+  # Camera intrinsic matrix (MUST be calibrated for your hardware)
+  # Run camera calibration before using visual odometry
+  camera_matrix:
+    - [500.0, 0.0, 320.0]    # fx, 0, cx
+    - [0.0, 500.0, 240.0]    # 0, fy, cy
+    - [0.0, 0.0, 1.0]        # 0, 0, 1
+  
+  # ORB feature detector parameters
+  nfeatures: 500
+  scale_factor: 1.2
+  nlevels: 8
+  
+  # Motion estimation
+  min_matches: 10
+  lowe_ratio: 0.75
+  ransac_threshold: 1.0
+  confidence: 0.99
+  
+  # Pose scaling (adjust based on calibration)
+  scale_factor: 0.1
+
+# ROS parameters
+ros:
+  use_sim_time: false  # Real hardware uses system time
+  
+# Performance tuning
+performance:
+  object_detection_rate: 10  # Hz
+  lane_detection_rate: 10    # Hz
+  visual_odometry_rate: 10   # Hz

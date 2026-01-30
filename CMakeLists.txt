@@ -28,4 +28,14 @@ install(
   DESTINATION share/${PROJECT_NAME}
 )
 
+# Install Python scripts
+install(PROGRAMS
+  src/object_detection_node.py
+  src/lane_detection_node.py
+  src/visual_odometry_node.py
+  src/lane_follower_node.py
+  src/sensor_fusion_node.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 ament_package()
