@@ -16,6 +16,15 @@
   <depend>nav2_smac_planner</depend>
   <depend>nav2_regulated_pure_pursuit_controller</depend>
   <depend>slam_toolbox</depend>
+  <depend>gazebo_ros</depend>
+  <depend>gazebo_ros2_control</depend>
+  <depend>controller_manager</depend>
+  <depend>joint_state_broadcaster</depend>
+  <depend>joint_trajectory_controller</depend>
+  <depend>velocity_controllers</depend>
+  <depend>position_controllers</depend>
+  <depend>robot_state_publisher</depend>
+  <depend>xacro</depend>
 
   <export>
     <build_type>ament_cmake</build_type>

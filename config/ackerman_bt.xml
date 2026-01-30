@@ -5,6 +5,7 @@
     <Sequence name="NavigateToPoseSequence">
       <ComputePathToPose goal="{goal}" path="{path}" planner_id="GridBased"/>
       <FollowPath path="{path}" controller_id="RegulatedPurePursuitController"/>
+      <Succeed/>
     </Sequence>
   </BehaviorTree>
 
@@ -22,7 +23,7 @@
           <FollowPath path="{path}" controller_id="RegulatedPurePursuitController"/>
         </ReactiveFallback>
       </ReactiveSequence>
-      <WaitForResult timeout="5.0"/>
+      <Wait duration="0.5"/>
     </SequenceStar>
   </BehaviorTree>
 

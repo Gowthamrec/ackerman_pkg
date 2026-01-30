@@ -100,13 +100,13 @@
             <!-- Max absolute linear speed in m/s -->
             <max_speed>5</max_speed>
 
-            <!-- PID tuning -->
-            <left_steering_pid_gain>1500 0 1</left_steering_pid_gain>
-            <left_steering_i_range>0 0</left_steering_i_range>
-            <right_steering_pid_gain>1500 0 1</right_steering_pid_gain>
-            <right_steering_i_range>0 0</right_steering_i_range>
-            <linear_velocity_pid_gain>1500 0 1</linear_velocity_pid_gain>
-            <linear_velocity_i_range>0 0</linear_velocity_i_range>
+            <!-- PID tuning - DAMPED FOR SMOOTH FINAL APPROACH -->
+            <left_steering_pid_gain>800 5 20</left_steering_pid_gain>
+            <left_steering_i_range>0 0.05</left_steering_i_range>
+            <right_steering_pid_gain>800 5 20</right_steering_pid_gain>
+            <right_steering_i_range>0 0.05</right_steering_i_range>
+            <linear_velocity_pid_gain>800 15 15</linear_velocity_pid_gain>
+            <linear_velocity_i_range>0 0.1</linear_velocity_i_range>
 
             <!-- output -->
             <publish_odom>true</publish_odom>
