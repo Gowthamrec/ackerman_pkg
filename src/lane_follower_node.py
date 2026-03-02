@@ -1,5 +1,120 @@
 #!/usr/bin/env python3
 """
+Risk-Aware Lane Follower
+
+- Subscribes to Nav2 cmd_vel
+- Applies steering correction from fused lane offset (from sensor_fusion_node)
+- Scales speed using /speed_factor
+
+Topics:
+  /cmd_vel                (in)  Nav2 output
+  /lane_offset_fused      (in)  Safe lane offset (0 if obstacle)
+  /speed_factor           (in)  0-1 risk-based speed scaling
+  /risk_level             (in)  NORMAL/CAUTION/SLOW/EMERGENCY (for logging)
+  /cmd_vel_lane_corrected (out) Final command
+"""
+
+import math
+
+import rclpy
+from rclpy.node import Node
+from geometry_msgs.msg import Twist
+from std_msgs.msg import Float32, String
+
+
+class LaneFollowerNode(Node):
+    def __init__(self):
+        super().__init__('lane_follower_node')
+
+        # Parameters
+        self.declare_parameter('enable_lane_following', 'true')
+        self.declare_parameter('lane_offset_gain', '0.5')
+        self.declare_parameter('max_steering_angle', '0.5')
+        self.declare_parameter('min_speed_factor', '0.05')
+
+        self.enable_lane_following = self.get_parameter('enable_lane_following').value.lower() == 'true'
+        self.lane_offset_gain = float(self.get_parameter('lane_offset_gain').value)
+        self.max_steering_angle = float(self.get_parameter('max_steering_angle').value)
+        self.min_speed_factor = float(self.get_parameter('min_speed_factor').value)
+
+        # State
+        self.current_cmd = Twist()
+        self.lane_offset = 0.0
+        self.lane_available = False
+        self.speed_factor = 1.0
+        self.risk_level = 'NORMAL'
+
+        # Subscribers
+        self.create_subscription(Twist, '/cmd_vel', self.cmd_vel_callback, 10)
+        self.create_subscription(Float32, '/lane_offset_fused', self.lane_offset_callback, 10)
+        self.create_subscription(Float32, '/speed_factor', self.speed_factor_callback, 10)
+        self.create_subscription(String, '/risk_level', self.risk_level_callback, 10)
+
+        # Publisher
+        self.cmd_pub = self.create_publisher(Twist, '/cmd_vel_lane_corrected', 10)
+
+        self.get_logger().info(
+            'Lane Follower Node initialized\n'
+            f'  Lane following: {self.enable_lane_following}\n'
+            f'  Offset gain: {self.lane_offset_gain}\n'
+            f'  Max steering: {self.max_steering_angle} rad/s\n'
+            f'  Min speed factor: {self.min_speed_factor}'
+        )
+
+    # ── Callbacks ──
+    def cmd_vel_callback(self, msg: Twist):
+        self.current_cmd = msg
+        out = Twist()
+        out.linear = msg.linear
+
+        # Apply lane correction if enabled and available
+        if self.enable_lane_following and self.lane_available:
+            correction = -self.lane_offset * self.lane_offset_gain
+            correction = max(-self.max_steering_angle, min(self.max_steering_angle, correction))
+            combined = msg.angular.z + correction
+            out.angular.z = max(-self.max_steering_angle, min(self.max_steering_angle, combined))
+        else:
+            out.angular = msg.angular
+
+        # Apply risk-based speed scaling
+        scale = max(self.min_speed_factor, min(1.0, self.speed_factor))
+        out.linear.x = msg.linear.x * scale
+        out.linear.y = msg.linear.y * scale
+        out.linear.z = msg.linear.z * scale
+
+        # Log when speed is reduced significantly
+        if scale < 0.99:
+            self.get_logger().debug(
+                f'Speed scaled: factor={scale:.2f} risk={self.risk_level} offset={self.lane_offset:.3f}')
+
+        self.cmd_pub.publish(out)
+
+    def lane_offset_callback(self, msg: Float32):
+        self.lane_offset = msg.data
+        self.lane_available = abs(msg.data) > 0.0
+
+    def speed_factor_callback(self, msg: Float32):
+        self.speed_factor = msg.data
+
+    def risk_level_callback(self, msg: String):
+        self.risk_level = msg.data.strip().upper() if msg.data else 'NORMAL'
+
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = LaneFollowerNode()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+
+
+if __name__ == '__main__':
+    main()#!/usr/bin/env python3
+"""
 Lane Following Controller Node
 - Subscribes to /cmd_vel from Nav2
 - Reads /lane_offset for steering correction

@@ -16,11 +16,13 @@ def generate_launch_description():
                 )]), launch_arguments={'use_sim_time': 'true'}.items()
     )
 
-    # Launch Gazebo
+    # Launch Gazebo with world file containing gazebo_ros_state plugin
+    world_file = os.path.join(get_package_share_directory(package_name), 'world', 'experiment.world')
     gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(get_package_share_directory('gazebo_ros'), 'launch', 'gazebo.launch.py')
-        )
+        ),
+        launch_arguments={'world': world_file}.items()
     )
 
     # Run the spawner node from the gazebo_ros package. The entity name doesn't really matter if you only have a single robot.

@@ -80,19 +80,19 @@ def generate_launch_description():
         output='screen'
     )
     
-    # 7. Visual odometry node (processes REAL laptop camera from /image)
-    visual_odometry_node = Node(
-        package='ackerman_pkg',
-        executable='visual_odometry_node.py',
-        name='visual_odometry_node',
-        parameters=[
-            {'camera_topic': '/image'},
-            {'publish_tf': 'false'}
-        ],
-        output='screen'
-    )
+    # 7. Visual odometry node - DISABLED (not used in final system)
+    # visual_odometry_node = Node(
+    #     package='ackerman_pkg',
+    #     executable='visual_odometry_node.py',
+    #     name='visual_odometry_node',
+    #     parameters=[
+    #         {'camera_topic': '/image'},
+    #         {'publish_tf': 'false'}
+    #     ],
+    #     output='screen'
+    # )
 
-    # 8. Sensor Fusion Node (LiDAR HIGH PRIORITY + Camera MEDIUM PRIORITY)
+    # 8. Sensor Fusion Node (OPTIMAL WEIGHTS from Stage 6 experiments)
     sensor_fusion_node = Node(
         package='ackerman_pkg',
         executable='sensor_fusion_node.py',
@@ -137,9 +137,9 @@ def generate_launch_description():
         # Vision nodes (process real laptop camera)
         object_detection_node,
         lane_detection_node,
-        visual_odometry_node,
+        # visual_odometry_node,  # Disabled - not used
         
-        # Sensor Fusion (LiDAR HIGH PRIORITY)
+        # Sensor Fusion (OPTIMAL WEIGHTS: α=0.4, β=0.4, γ=0.2)
         sensor_fusion_node,
         
         # Lane following controller (uses fused data)

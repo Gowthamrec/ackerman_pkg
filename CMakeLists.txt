@@ -35,6 +35,8 @@ install(PROGRAMS
   src/visual_odometry_node.py
   src/lane_follower_node.py
   src/sensor_fusion_node.py
+  src/experiment_runner.py
+  src/generate_results.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

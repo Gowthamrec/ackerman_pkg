@@ -1,5 +1,237 @@
 #!/usr/bin/env python3
 """
+Risk-Based Sensor Fusion Node
+
+Priority rules (safety-first):
+1. LiDAR (HIGH)  - front sector obstacle check; overrides everything
+2. Camera (MED)  - obstacles only if LiDAR is clear
+3. Lane  (LOW)   - only when both LiDAR and camera are clear
+
+Outputs:
+- /obstacles_fused (String)
+- /lane_offset_fused (Float32)  -> 0 if any obstacle
+- /sensor_fusion_status (String)
+- /speed_factor (Float32)       -> for risk-aware speed scaling
+- /risk_score (Float32)         -> continuous risk [0,1]
+- /risk_level (String)          -> NORMAL/CAUTION/SLOW/EMERGENCY
+"""
+
+import math
+import numpy as np
+
+import rclpy
+from rclpy.node import Node
+from sensor_msgs.msg import LaserScan
+from std_msgs.msg import String, Float32
+
+
+class SensorFusionNode(Node):
+    def __init__(self):
+        super().__init__('sensor_fusion_node')
+
+        # ── Parameters (all passed as strings in launch) ──
+        self.declare_parameter('alpha_lidar', '0.5')
+        self.declare_parameter('beta_camera', '0.3')
+        self.declare_parameter('gamma_lane', '0.2')
+        self.declare_parameter('emergency_threshold', '0.8')
+        self.declare_parameter('slow_threshold', '0.5')
+        self.declare_parameter('caution_threshold', '0.2')
+        self.declare_parameter('lidar_max_relevant_dist', '5.0')
+        self.declare_parameter('lidar_angle_range', '60.0')  # degrees (front sector)
+        self.declare_parameter('lidar_min_safe_distance', '0.5')
+        self.declare_parameter('use_camera_obstacles', 'true')
+        self.declare_parameter('use_lane_following', 'true')
+        self.declare_parameter('fusion_rate', '10.0')  # Hz
+
+        # ── Parameter values ──
+        self.alpha = float(self.get_parameter('alpha_lidar').value)
+        self.beta = float(self.get_parameter('beta_camera').value)
+        self.gamma = float(self.get_parameter('gamma_lane').value)
+        self.emergency_th = float(self.get_parameter('emergency_threshold').value)
+        self.slow_th = float(self.get_parameter('slow_threshold').value)
+        self.caution_th = float(self.get_parameter('caution_threshold').value)
+        self.lidar_max_dist = float(self.get_parameter('lidar_max_relevant_dist').value)
+        self.lidar_angle_range = float(self.get_parameter('lidar_angle_range').value)
+        self.lidar_min_safe = float(self.get_parameter('lidar_min_safe_distance').value)
+        self.use_camera = self.get_parameter('use_camera_obstacles').value.lower() == 'true'
+        self.use_lane = self.get_parameter('use_lane_following').value.lower() == 'true'
+        fusion_rate = float(self.get_parameter('fusion_rate').value)
+
+        # ── State ──
+        self.lidar_min_distance = float('inf')
+        self.lidar_obstacle = False
+        self.camera_obstacle = False
+        self.camera_obstacles = []
+        self.lane_offset = 0.0
+        self.lane_detected = False
+
+        # ── Subscribers ──
+        self.create_subscription(LaserScan, '/scan', self.lidar_callback, 10)
+        self.create_subscription(String, '/obstacles_detected', self.camera_callback, 10)
+        self.create_subscription(Float32, '/lane_offset', self.lane_offset_callback, 10)
+        self.create_subscription(String, '/lane_status', self.lane_status_callback, 10)
+
+        # ── Publishers ──
+        self.obstacles_pub = self.create_publisher(String, '/obstacles_fused', 10)
+        self.lane_offset_pub = self.create_publisher(Float32, '/lane_offset_fused', 10)
+        self.status_pub = self.create_publisher(String, '/sensor_fusion_status', 10)
+        self.speed_factor_pub = self.create_publisher(Float32, '/speed_factor', 10)
+        self.risk_score_pub = self.create_publisher(Float32, '/risk_score', 10)
+        self.risk_level_pub = self.create_publisher(String, '/risk_level', 10)
+
+        # ── Timer ──
+        period = 1.0 / fusion_rate if fusion_rate > 0 else 0.1
+        self.create_timer(period, self.publish_fused_data)
+
+        self.get_logger().info(
+            'Sensor Fusion Node initialized\n'
+            f'  alpha (LiDAR): {self.alpha}\n'
+            f'  beta  (Camera): {self.beta}\n'
+            f'  gamma (Lane): {self.gamma}\n'
+            f'  LiDAR angle range: {self.lidar_angle_range} deg\n'
+            f'  LiDAR safe distance: {self.lidar_min_safe} m')
+
+    # ── Callbacks ──
+    def lidar_callback(self, msg: LaserScan):
+        try:
+            ranges = np.array(msg.ranges)
+            angle_min = msg.angle_min
+            angle_max = msg.angle_max
+            angle_inc = msg.angle_increment
+            half_range_rad = math.radians(self.lidar_angle_range / 2.0)
+
+            angles = np.arange(angle_min, angle_max, angle_inc)
+            mask = np.abs(angles) <= half_range_rad
+            relevant = ranges[mask]
+
+            valid = relevant[(relevant > msg.range_min) & (relevant < msg.range_max)]
+            if len(valid) == 0:
+                self.lidar_min_distance = float('inf')
+                self.lidar_obstacle = False
+                return
+
+            min_d = float(np.min(valid))
+            self.lidar_min_distance = min_d
+            self.lidar_obstacle = min_d < self.lidar_min_safe
+        except Exception as e:
+            self.get_logger().error(f'LiDAR processing error: {e}')
+
+    def camera_callback(self, msg: String):
+        if not self.use_camera:
+            self.camera_obstacle = False
+            self.camera_obstacles = []
+            return
+        try:
+            data = msg.data.strip()
+            if not data:
+                self.camera_obstacle = False
+                self.camera_obstacles = []
+                return
+            # Simple parse: split by comma
+            self.camera_obstacles = [p.strip() for p in data.split(',') if p.strip()]
+            self.camera_obstacle = len(self.camera_obstacles) > 0
+        except Exception as e:
+            self.get_logger().error(f'Camera parsing error: {e}')
+            self.camera_obstacle = False
+            self.camera_obstacles = []
+
+    def lane_offset_callback(self, msg: Float32):
+        self.lane_offset = msg.data
+
+    def lane_status_callback(self, msg: String):
+        text = msg.data.lower()
+        self.lane_detected = 'detect' in text or 'true' in text
+
+    # ── Fusion ──
+    def publish_fused_data(self):
+        try:
+            # LiDAR risk: inverse of distance (clamped)
+            if math.isfinite(self.lidar_min_distance):
+                lidar_risk = max(0.0, min(1.0, (self.lidar_max_dist - self.lidar_min_distance) / self.lidar_max_dist))
+            else:
+                lidar_risk = 0.0
+
+            camera_risk = 1.0 if self.camera_obstacle else 0.0
+            lane_risk = max(0.0, min(1.0, abs(self.lane_offset))) if self.use_lane else 0.0
+
+            risk_score = (
+                self.alpha * lidar_risk +
+                self.beta * camera_risk +
+                self.gamma * lane_risk
+            )
+
+            # Risk level → speed factor
+            if risk_score >= self.emergency_th:
+                risk_level = 'EMERGENCY'
+                speed_factor = 0.1
+            elif risk_score >= self.slow_th:
+                risk_level = 'SLOW'
+                speed_factor = 0.35
+            elif risk_score >= self.caution_th:
+                risk_level = 'CAUTION'
+                speed_factor = 0.6
+            else:
+                risk_level = 'NORMAL'
+                speed_factor = 1.0
+
+            # Lane gating (safety first)
+            if self.lidar_obstacle or self.camera_obstacle:
+                lane_offset_fused = 0.0
+            else:
+                lane_offset_fused = self.lane_offset if (self.use_lane and self.lane_detected) else 0.0
+
+            # Obstacles fused message
+            fused_list = []
+            if self.lidar_obstacle:
+                fused_list.append(f'LiDAR obstacle {self.lidar_min_distance:.2f}m')
+            if self.camera_obstacle:
+                fused_list.extend(self.camera_obstacles)
+            obstacles_msg = String()
+            obstacles_msg.data = ', '.join(fused_list) if fused_list else 'clear'
+
+            # Publish
+            lane_msg = Float32()
+            lane_msg.data = lane_offset_fused
+            speed_msg = Float32()
+            speed_msg.data = speed_factor
+            risk_msg = Float32()
+            risk_msg.data = risk_score
+            risk_level_msg = String()
+            risk_level_msg.data = risk_level
+            status_msg = String()
+            status_msg.data = (
+                f'LiDAR: {self.lidar_min_distance:.2f}m (obs={self.lidar_obstacle}), '
+                f'Camera: {self.camera_obstacles}, '
+                f'Lane: {self.lane_offset:.2f} (detected={self.lane_detected}), '
+                f'Risk: {risk_score:.3f} [{risk_level}]'
+            )
+
+            self.obstacles_pub.publish(obstacles_msg)
+            self.lane_offset_pub.publish(lane_msg)
+            self.speed_factor_pub.publish(speed_msg)
+            self.risk_score_pub.publish(risk_msg)
+            self.risk_level_pub.publish(risk_level_msg)
+            self.status_pub.publish(status_msg)
+
+        except Exception as e:
+            self.get_logger().error(f'Fusion error: {e}')
+
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = SensorFusionNode()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+
+
+if __name__ == '__main__':
+    main()#!/usr/bin/env python3
+"""
 Sensor Fusion Node - Prioritizes LiDAR for Obstacle Detection
 - LiDAR (HIGH PRIORITY): Reliable obstacle detection
 - Camera (MEDIUM PRIORITY): Lane detection, object classification
