@@ -28,15 +28,14 @@ install(
   DESTINATION share/${PROJECT_NAME}
 )
 
-# Install Python scripts
+# Install Python scripts (real-time operation nodes only)
 install(PROGRAMS
   src/object_detection_node.py
   src/lane_detection_node.py
-  src/visual_odometry_node.py
   src/lane_follower_node.py
   src/sensor_fusion_node.py
-  src/experiment_runner.py
-  src/generate_results.py
+  src/obstacle_manager_node.py
+  src/arduino_bridge_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

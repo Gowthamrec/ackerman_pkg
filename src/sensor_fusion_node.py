@@ -123,12 +123,17 @@ class SensorFusionNode(Node):
             return
         try:
             data = msg.data.strip()
-            if not data:
+            # 'clear' or empty → no obstacle
+            if not data or 'clear' in data.lower():
                 self.camera_obstacle = False
                 self.camera_obstacles = []
                 return
-            # Simple parse: split by comma
-            self.camera_obstacles = [p.strip() for p in data.split(',') if p.strip()]
+            # Parse 'Obstacles detected: person, car, ...' format
+            if 'Obstacles detected:' in data or 'obstacles detected:' in data.lower():
+                parts = data.split(':', 1)[-1]  # everything after the colon
+                self.camera_obstacles = [p.strip() for p in parts.split(',') if p.strip()]
+            else:
+                self.camera_obstacles = [p.strip() for p in data.split(',') if p.strip()]
             self.camera_obstacle = len(self.camera_obstacles) > 0
         except Exception as e:
             self.get_logger().error(f'Camera parsing error: {e}')
@@ -145,32 +150,13 @@ class SensorFusionNode(Node):
     # ── Fusion ──
     def publish_fused_data(self):
         try:
-            # LiDAR risk: inverse of distance (clamped)
-            if math.isfinite(self.lidar_min_distance):
-                lidar_risk = max(0.0, min(1.0, (self.lidar_max_dist - self.lidar_min_distance) / self.lidar_max_dist))
-            else:
-                lidar_risk = 0.0
-
-            camera_risk = 1.0 if self.camera_obstacle else 0.0
-            lane_risk = max(0.0, min(1.0, abs(self.lane_offset))) if self.use_lane else 0.0
-
-            risk_score = (
-                self.alpha * lidar_risk +
-                self.beta * camera_risk +
-                self.gamma * lane_risk
-            )
-
-            # Risk level → speed factor
-            if risk_score >= self.emergency_th:
+            # SIMPLE BINARY RULE: object detected → risk 1.0 EMERGENCY, else 0.0 NORMAL
+            if self.camera_obstacle:
+                risk_score = 1.0
                 risk_level = 'EMERGENCY'
-                speed_factor = 0.1
-            elif risk_score >= self.slow_th:
-                risk_level = 'SLOW'
-                speed_factor = 0.35
-            elif risk_score >= self.caution_th:
-                risk_level = 'CAUTION'
-                speed_factor = 0.6
+                speed_factor = 0.0  # full stop
             else:
+                risk_score = 0.0
                 risk_level = 'NORMAL'
                 speed_factor = 1.0
 
@@ -274,6 +260,9 @@ class SensorFusionNode(Node):
         
         self.lane_offset = 0.0
         self.lane_detected = False
+
+        # Navigation goal state
+        self.goal_pose_received = False  # True once user gives a 2D Nav Goal
         
         # Subscribers
         # 1. LiDAR Scan (HIGH PRIORITY)
@@ -306,6 +295,14 @@ class SensorFusionNode(Node):
             self.lane_status_callback,
             10
         )
+
+        # 4. Navigation Goal (enables detection only when a goal is active)
+        self.goal_pose_sub = self.create_subscription(
+            PoseStamped,
+            '/goal_pose',
+            self.goal_pose_callback,
+            10
+        )
         
         # Publishers
         # Fused obstacle detection (PRIMARY for navigation)
@@ -331,7 +328,14 @@ class SensorFusionNode(Node):
         
         # Timer for publishing fused data
         self.timer = self.create_timer(0.1, self.publish_fused_data)
-        
+
+        # 5-second obstacle wait state machine
+        # States: 'idle' → 'waiting' (0-10s, robot stops) → 'timeout' (nav2 replans)
+        self.wait_state = 'idle'
+        self.obstacle_wait_start = None   # clock time (sec) when obstacle first seen
+        self.obstacle_wait_duration = 10.0 # seconds to wait before letting Nav2 replan
+        self.last_countdown_print = -1    # track last printed second for countdown
+
         self.get_logger().info(
             f"Sensor Fusion Node initialized\n"
             f"  LiDAR Priority: {self.lidar_priority}\n"
@@ -407,50 +411,117 @@ class SensorFusionNode(Node):
         """Receive lane status"""
         self.lane_detected = "detected" in msg.data.lower()
     
+    def goal_pose_callback(self, msg):
+        """Enable obstacle detection only when a navigation goal has been given."""
+        if not self.goal_pose_received:
+            self.goal_pose_received = True
+            self.get_logger().info(
+                f'\n========================================\n'
+                f'  NAVIGATION GOAL RECEIVED\n'
+                f'  Obstacle detection / wait procedure ARMED\n'
+                f'========================================')
+
     def publish_fused_data(self):
-        """Publish fused sensor data with prioritization"""
+        """Publish fused sensor data.
+
+        Camera has FULL PRIORITY - any detected object stops the robot.
+        Behaviour:
+          - Camera OR LiDAR detects obstacle → robot stops immediately.
+          - Wait 10 s for obstacle to move (countdown printed every second).
+          - Obstacle moves away within 10 s → resume immediately.
+          - Obstacle persists after 10 s → Nav2 replans alternative route.
+        """
         try:
-            # PRIMARY: LiDAR-based decision (HIGH PRIORITY)
-            fused_obstacles = []
-            
-            if self.lidar_obstacle_detected:
-                fused_obstacles.append(f"LiDAR obstacle at {self.lidar_distance:.2f}m")
-                
-                # If LiDAR detects obstacle, DON'T use lane following
-                # (safety first - avoid hitting obstacle while following lane)
+            # CAMERA ONLY PRIORITY: ignore LiDAR for obstacle stopping
+            any_obstacle = self.camera_obstacle_detected
+            now = self.get_clock().now().nanoseconds / 1e9
+
+            # ── 10-second wait state machine ─────────────────────────────────
+            # Only trigger waiting when a navigation goal has been given
+            if any_obstacle and self.goal_pose_received:
+                if self.wait_state == 'idle':
+                    self.wait_state = 'waiting'
+                    self.obstacle_wait_start = now
+                    self.last_countdown_print = -1
+                    src = []
+                    if self.camera_obstacle_detected:
+                        src.append(f'CAMERA({self.camera_obstacles})')
+                    if self.lidar_obstacle_detected:
+                        src.append(f'LiDAR({self.lidar_distance:.2f}m)')
+                    self.get_logger().info(
+                        f'\n========================================\n'
+                        f'  OBSTACLE DETECTED by {" + ".join(src)}\n'
+                        f'  ROBOT STOPPED - waiting 10 s for obstacle to move\n'
+                        f'========================================')
+
+                if self.wait_state == 'waiting':
+                    elapsed = now - self.obstacle_wait_start
+                    remaining = self.obstacle_wait_duration - elapsed
+                    # Print countdown every second
+                    current_sec = int(elapsed)
+                    if current_sec != self.last_countdown_print:
+                        self.last_countdown_print = current_sec
+                        self.get_logger().info(
+                            f'  [WAITING] {elapsed:.0f}s elapsed - '
+                            f'{remaining:.0f}s remaining before replan...')
+
+                    if elapsed < self.obstacle_wait_duration:
+                        report_obstacle = True
+                    else:
+                        self.wait_state = 'timeout'
+                        self.get_logger().warn(
+                            f'\n========================================\n'
+                            f'  TIMEOUT: Obstacle did not move after 10 s\n'
+                            f'  Releasing control → Nav2 will REPLAN route\n'
+                            f'========================================')
+                        report_obstacle = False
+                else:
+                    report_obstacle = False
+            else:
+                if self.wait_state != 'idle':
+                    self.get_logger().info(
+                        f'\n========================================\n'
+                        f'  OBSTACLE CLEARED - resuming original path\n'
+                        f'========================================')
+                self.wait_state = 'idle'
+                self.obstacle_wait_start = None
+                self.last_countdown_print = -1
+                report_obstacle = False
+
+            # ── Build fused messages ─────────────────────────────────────────
+            if report_obstacle:
+                elapsed = now - self.obstacle_wait_start
+                fused_parts = []
+                if self.camera_obstacle_detected:
+                    fused_parts.extend(self.camera_obstacles)
+                fused_msg_data = f"Fused obstacles: {', '.join(fused_parts)} (wait {elapsed:.1f}s/10.0s)"
                 lane_offset_to_pub = 0.0
             else:
-                # LiDAR clear - can use lane following
-                if self.camera_obstacle_detected:
-                    fused_obstacles.extend(self.camera_obstacles)
-                
-                # Use lane offset only if no obstacles detected
+                fused_msg_data = 'No obstacles detected (clear)'
                 lane_offset_to_pub = self.lane_offset if self.lane_detected else 0.0
-            
-            # Publish fused obstacles
+
+            # ── Publish ──────────────────────────────────────────────────────
             fused_msg = String()
-            if fused_obstacles:
-                fused_msg.data = f"Fused obstacles: {', '.join(fused_obstacles)}"
-            else:
-                fused_msg.data = "No obstacles detected (LiDAR clear)"
+            fused_msg.data = fused_msg_data
             self.fused_obstacles_pub.publish(fused_msg)
-            
-            # Publish fused lane offset (safe only when no obstacles)
+
             lane_msg = Float32()
             lane_msg.data = lane_offset_to_pub
             self.fused_lane_offset_pub.publish(lane_msg)
-            
-            # Publish fusion status for debugging
+
+            wait_info = (
+                f"{now - self.obstacle_wait_start:.1f}s"
+                if self.obstacle_wait_start is not None else 'inactive')
             status_msg = String()
             status_msg.data = (
-                f"LiDAR: {self.lidar_distance:.2f}m (obstacle={self.lidar_obstacle_detected}), "
-                f"Camera: {self.camera_obstacles}, "
-                f"Lane: {self.lane_offset:.2f} (detected={self.lane_detected})"
+                f'Camera: {self.camera_obstacles}(priority=FULL), '
+                f'LiDAR: {self.lidar_distance:.2f}m, '
+                f'Wait: [{self.wait_state}] {wait_info}'
             )
             self.fusion_status_pub.publish(status_msg)
-        
+
         except Exception as e:
-            self.get_logger().error(f"Fusion publishing error: {e}")
+            self.get_logger().error(f'Fusion publishing error: {e}')
 
 
 def main(args=None):

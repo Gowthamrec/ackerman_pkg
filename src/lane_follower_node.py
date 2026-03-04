@@ -53,6 +53,10 @@ class LaneFollowerNode(Node):
         # Publisher
         self.cmd_pub = self.create_publisher(Twist, '/cmd_vel_lane_corrected', 10)
 
+        # 10Hz stop timer: continuously hold zero when speed_factor is 0 (risk=EMERGENCY)
+        # Overrides velocity_smoother which also publishes to /cmd_vel
+        self.create_timer(0.1, self.stop_timer_callback)
+
         self.get_logger().info(
             'Lane Follower Node initialized\n'
             f'  Lane following: {self.enable_lane_following}\n'
@@ -65,6 +69,17 @@ class LaneFollowerNode(Node):
     def cmd_vel_callback(self, msg: Twist):
         self.current_cmd = msg
         out = Twist()
+
+        # Do NOT forward zero/idle commands — only move when Nav2 explicitly commands it
+        if msg.linear.x == 0.0 and msg.linear.y == 0.0 and msg.angular.z == 0.0:
+            self.cmd_pub.publish(out)  # publish zero (stop)
+            return
+
+        # FULL STOP when risk = 1 (speed_factor = 0.0)
+        if self.speed_factor == 0.0:
+            self.cmd_pub.publish(Twist())
+            return
+
         out.linear = msg.linear
 
         # Apply lane correction if enabled and available
@@ -76,8 +91,8 @@ class LaneFollowerNode(Node):
         else:
             out.angular = msg.angular
 
-        # Apply risk-based speed scaling
-        scale = max(self.min_speed_factor, min(1.0, self.speed_factor))
+        # Apply risk-based speed scaling (0.0 = full stop, already handled above)
+        scale = min(1.0, self.speed_factor)
         out.linear.x = msg.linear.x * scale
         out.linear.y = msg.linear.y * scale
         out.linear.z = msg.linear.z * scale
@@ -88,6 +103,12 @@ class LaneFollowerNode(Node):
                 f'Speed scaled: factor={scale:.2f} risk={self.risk_level} offset={self.lane_offset:.3f}')
 
         self.cmd_pub.publish(out)
+
+    def stop_timer_callback(self):
+        """At 10 Hz, keep publishing zero while risk is EMERGENCY (speed_factor=0.0).
+        This overrides Nav2's velocity_smoother which also publishes to /cmd_vel."""
+        if self.speed_factor == 0.0:
+            self.cmd_pub.publish(Twist())
 
     def lane_offset_callback(self, msg: Float32):
         self.lane_offset = msg.data
@@ -123,7 +144,7 @@ Lane Following Controller Node
 
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Twist, PoseStamped
 from std_msgs.msg import Float32, String
 import math
 
@@ -147,9 +168,11 @@ class LaneFollowerNode(Node):
         
         # State variables
         self.current_cmd_vel = Twist()
-        self.lane_offset = 0.0  # Offset from lane center (-1 to 1, normalized)
+        self.lane_offset = 0.0
         self.lane_detected = False
         self.lane_confidence = 0.0
+        self.camera_obstacle = False  # Camera obstacle → stop robot
+        self.goal_pose_received = False  # Only activate stop logic after a Nav2 goal is given
         
         # Subscribers
         self.cmd_vel_sub = self.create_subscription(
@@ -172,6 +195,22 @@ class LaneFollowerNode(Node):
             self.lane_status_callback,
             10
         )
+
+        # Subscribe to fused obstacles → stop robot when camera detects object
+        self.obstacles_fused_sub = self.create_subscription(
+            String,
+            '/obstacles_fused',
+            self.obstacles_fused_callback,
+            10
+        )
+
+        # Subscribe to navigation goal → arm the stop procedure only when goal is given
+        self.goal_pose_sub = self.create_subscription(
+            PoseStamped,
+            '/goal_pose',
+            self.goal_pose_callback,
+            10
+        )
         
         # Publishers
         self.cmd_vel_corrected_pub = self.create_publisher(
@@ -179,7 +218,11 @@ class LaneFollowerNode(Node):
             '/cmd_vel_lane_corrected',
             10
         )
-        
+
+        # 10Hz timer: continuously publish zero velocity while obstacle active
+        # This overrides velocity_smoother which also publishes to /cmd_vel
+        self.stop_timer = self.create_timer(0.1, self.stop_timer_callback)
+
         self.get_logger().info(
             f"Lane Follower Node initialized\n"
             f"  Lane Following: {self.enable_lane_following}\n"
@@ -190,15 +233,39 @@ class LaneFollowerNode(Node):
     def cmd_vel_callback(self, msg):
         """Receive velocity command from Nav2"""
         self.current_cmd_vel = msg
-        
+
+        # Only stop if a goal was given AND obstacle detected
+        if self.camera_obstacle and self.goal_pose_received:
+            self.cmd_vel_corrected_pub.publish(Twist())  # full stop
+            return
+
         # Apply lane correction if lane is detected
         if self.enable_lane_following and self.lane_detected:
             corrected_cmd_vel = self.apply_lane_correction(msg)
             self.cmd_vel_corrected_pub.publish(corrected_cmd_vel)
         else:
-            # Pass through original command if lane not detected
             self.cmd_vel_corrected_pub.publish(msg)
     
+    def obstacles_fused_callback(self, msg):
+        """Stop the robot when obstacle detected and a goal has been given"""
+        was_obstacle = self.camera_obstacle
+        self.camera_obstacle = 'Fused obstacles:' in msg.data
+        if self.camera_obstacle and not was_obstacle and self.goal_pose_received:
+            self.get_logger().info('LANE FOLLOWER: Obstacle detected after goal given - holding robot STOPPED')
+        elif not self.camera_obstacle and was_obstacle:
+            self.get_logger().info('LANE FOLLOWER: Obstacle cleared - resuming movement')
+
+    def goal_pose_callback(self, msg):
+        """Arm the stop procedure when a navigation goal is received"""
+        if not self.goal_pose_received:
+            self.goal_pose_received = True
+            self.get_logger().info('LANE FOLLOWER: Navigation goal received - stop procedure ARMED')
+
+    def stop_timer_callback(self):
+        """Continuously publish zero at 10Hz when goal given AND obstacle detected."""
+        if self.camera_obstacle and self.goal_pose_received:
+            self.cmd_vel_corrected_pub.publish(Twist())
+
     def lane_offset_callback(self, msg):
         """Receive lane offset from lane detection node"""
         self.lane_offset = msg.data

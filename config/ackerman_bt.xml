@@ -18,7 +18,7 @@
         <ReactiveFallback name="ObstacleHandler">
           <Sequence name="PauseIfObstacle">
             <ObstacleDetected/>
-            <Pause duration="2.0"/>
+            <Pause duration="5.0"/>
           </Sequence>
           <FollowPath path="{path}" controller_id="RegulatedPurePursuitController"/>
         </ReactiveFallback>

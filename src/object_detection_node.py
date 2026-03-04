@@ -93,8 +93,8 @@ class ObjectDetectionNode(Node):
                 # Get frame dimensions
                 h, w = frame.shape[:2]
                 
-                # Run inference (with reduced resolution for speed)
-                results = self.model(frame, verbose=False, imgsz=416)  # Reduced from 640 for faster inference
+                # Run inference (reduced resolution for speed - 256 fastest, 416 balanced)
+                results = self.model(frame, verbose=False, imgsz=256)
                 
                 # Process detections
                 detections = []
@@ -132,7 +132,7 @@ class ObjectDetectionNode(Node):
                                     'relative_position': [rel_x, rel_y]
                                 }
                                 detections.append(detection_data)
-                                
+
                                 # Check if obstacle (anything not far away or small)
                                 if box_width > 50:  # Significant object in frame
                                     obstacles.append(class_name)
@@ -149,11 +149,21 @@ class ObjectDetectionNode(Node):
                 detections_msg.data = str(detections)
                 self.detections_pub.publish(detections_msg)
                 
-                # Publish obstacles
+                # Publish obstacles (always publish so sensor_fusion can reset)
+                obstacles_msg = String()
                 if obstacles:
-                    obstacles_msg = String()
-                    obstacles_msg.data = f"Obstacles detected: {', '.join(set(obstacles))}"
-                    self.obstacles_pub.publish(obstacles_msg)
+                    detected_str = ', '.join(set(obstacles))
+                    obstacles_msg.data = f"Obstacles detected: {detected_str}"
+                    # Bold terminal print for visibility
+                    self.get_logger().info(
+                        f'\n========================================\n'
+                        f'  OBJECT DETECTED: {detected_str}\n'
+                        f'  Count: {len(obstacles)} object(s) in frame\n'
+                        f'  Robot will STOP for 10 seconds!\n'
+                        f'========================================')
+                else:
+                    obstacles_msg.data = "clear"
+                self.obstacles_pub.publish(obstacles_msg)
                 
                 # Publish annotated image
                 if self.enable_visualization:

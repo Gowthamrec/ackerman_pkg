@@ -25,11 +25,13 @@ def generate_launch_description():
         launch_arguments={'use_sim_time': 'true'}.items()
     )
 
-    # 2. Gazebo simulation launch
+    # 2. Gazebo simulation launch (with world file)
+    world_file = os.path.join(pkg_share_dir, 'world', 'experiment.world')
     gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(get_package_share_directory('gazebo_ros'), 'launch', 'gazebo.launch.py')
-        )
+        ),
+        launch_arguments={'world': world_file}.items()
     )
 
     # 3. Spawn robot entity
@@ -42,15 +44,16 @@ def generate_launch_description():
         output='screen'
     )
 
-    # 4. Laptop camera (REAL WORLD camera - publishes to /camera/image_raw)
+    # 4. Laptop camera (REAL WORLD camera - publishes to /image)
     laptop_camera = Node(
         package='image_tools',
         executable='cam2image',
         name='laptop_camera',
         parameters=[
             {'device_id': 0},
-            {'output_topic': '/camera/image_raw'},
-            {'frequency': 10.0}
+            {'topic_name': '/image'},
+            {'frequency': 10.0},
+            {'use_sim_time': True}
         ],
         output='screen'
     )
@@ -63,7 +66,8 @@ def generate_launch_description():
         parameters=[
             {'camera_topic': '/image'},
             {'confidence_threshold': '0.6'},
-            {'enable_visualization': 'true'}
+            {'enable_visualization': 'true'},
+            {'use_sim_time': True}
         ],
         output='screen'
     )
@@ -75,7 +79,8 @@ def generate_launch_description():
         name='lane_detection_node',
         parameters=[
             {'camera_topic': '/image'},
-            {'enable_visualization': 'true'}
+            {'enable_visualization': 'true'},
+            {'use_sim_time': True}
         ],
         output='screen'
     )
@@ -102,7 +107,8 @@ def generate_launch_description():
             {'lidar_angle_range': '60.0'},     # Front 60 degrees
             {'use_camera_obstacles': 'true'},
             {'use_lane_following': 'true'},
-            {'lidar_priority': 'true'}         # LiDAR overrides camera
+            {'lidar_priority': 'true'},        # LiDAR overrides camera
+            {'use_sim_time': True}
         ],
         output='screen'
     )
@@ -115,11 +121,13 @@ def generate_launch_description():
         parameters=[
             {'enable_lane_following': 'true'},
             {'lane_offset_gain': '0.5'},
-            {'max_steering_angle': '0.5'}
+            {'max_steering_angle': '0.5'},
+            {'use_sim_time': True}
         ],
         remappings=[
+            # Nav2 publishes to /cmd_vel_nav → node reads it as /cmd_vel
             ('/cmd_vel', '/cmd_vel_nav'),
-            ('/lane_offset', '/lane_offset_fused'),  # Use FUSED lane offset (0 if obstacle)
+            # Node output /cmd_vel_lane_corrected → becomes the real /cmd_vel to motors
             ('/cmd_vel_lane_corrected', '/cmd_vel')
         ],
         output='screen'
