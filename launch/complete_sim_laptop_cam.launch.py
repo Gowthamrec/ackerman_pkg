@@ -104,7 +104,7 @@ def generate_launch_description():
         name='sensor_fusion_node',
         parameters=[
             {'lidar_range_threshold': '0.5'},  # 0.5m - HIGH PRIORITY detection
-            {'lidar_angle_range': '60.0'},     # Front 60 degrees
+            {'lidar_angle_range': '180.0'},     # Front 180 degrees
             {'use_camera_obstacles': 'true'},
             {'use_lane_following': 'true'},
             {'lidar_priority': 'true'},        # LiDAR overrides camera

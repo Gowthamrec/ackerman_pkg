@@ -133,7 +133,7 @@ def generate_launch_description():
             {'slow_threshold': '0.5'},      # R >= 0.5 → SLOW (35% speed)
             {'caution_threshold': '0.2'},   # R >= 0.2 → CAUTION (60% speed)
             {'lidar_max_relevant_dist': '5.0'},
-            {'lidar_angle_range': '60.0'},  # Front ±30° sector
+            {'lidar_angle_range': '180.0'},  # Front 180° sector
             {'lidar_min_safe_distance': '0.5'},
             {'use_camera_obstacles': 'true'},
             {'use_lane_following': 'true'},

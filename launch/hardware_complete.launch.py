@@ -90,7 +90,7 @@ def generate_launch_description():
             {'slow_threshold': '0.5'},
             {'caution_threshold': '0.2'},
             {'lidar_max_relevant_dist': '5.0'},
-            {'lidar_angle_range': '60.0'},
+            {'lidar_angle_range': '180.0'},
             {'lidar_min_safe_distance': '0.5'},
             {'use_camera_obstacles': 'true'},
             {'use_lane_following': 'true'},

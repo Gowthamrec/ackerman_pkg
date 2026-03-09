@@ -36,6 +36,7 @@ install(PROGRAMS
   src/sensor_fusion_node.py
   src/obstacle_manager_node.py
   src/arduino_bridge_node.py
+  src/visual_odometry_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
