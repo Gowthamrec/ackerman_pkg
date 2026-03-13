@@ -15,13 +15,13 @@ Includes ALL components:
 Usage:
   # Full autonomous navigation on saved map:
   ros2 launch ackerman_pkg hw_main.launch.py \
-    map:=/home/ros2/car_project_ws/src/ackerman_pkg/map/my_map.yaml
+        map:=/home/surjith/car_project/src/ackerman_pkg/map/my_map.yaml
 
   # With custom camera/lidar ports:
   ros2 launch ackerman_pkg hw_main.launch.py \
     map:=/path/to/my_map.yaml \
     serial_port:=/dev/ttyUSB0 \
-    camera_device:=/dev/video0
+        camera_device:=/dev/video2
 
 TOPIC FLOW:
   RPLidar → /scan
@@ -59,7 +59,7 @@ def generate_launch_description():
     )
     camera_device_arg = DeclareLaunchArgument(
         'camera_device',
-        default_value='/dev/video0',
+        default_value='/dev/video2',
         description='Video device for USB webcam'
     )
 

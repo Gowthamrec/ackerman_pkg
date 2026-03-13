@@ -12,7 +12,7 @@ Prerequisites (run first):
 
 Save map when done:
   ros2 run nav2_map_server map_saver_cli \
-    -f ~/car_project_ws/src/ackerman_pkg/map/my_map
+    -f /home/surjith/car_project/src/ackerman_pkg/map/my_map
 
 Standalone:
   ros2 launch ackerman_pkg hw_slam_mapping.launch.py

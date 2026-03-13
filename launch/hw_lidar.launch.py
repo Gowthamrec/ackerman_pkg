@@ -39,6 +39,8 @@ def generate_launch_description():
         executable='rplidar_node',
         name='rplidar_node',
         output='screen',
+        respawn=True,
+        respawn_delay=3.0,
         parameters=[{
             'serial_port': LaunchConfiguration('serial_port'),
             'serial_baudrate': LaunchConfiguration('serial_baudrate'),

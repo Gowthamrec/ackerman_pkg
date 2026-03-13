@@ -70,7 +70,6 @@ class VisualOdometryNode(Node):
         self.declare_parameter('camera_cy', '240.0')
         self.declare_parameter('min_features', '30')
         self.declare_parameter('camera_height', '0.15')  # metres — measure on your car
-        self.declare_parameter('use_sim_time', 'false')
 
         self.camera_topic = self.get_parameter('camera_topic').value
         self.publish_tf   = self.get_parameter('publish_tf').value.lower() == 'true'

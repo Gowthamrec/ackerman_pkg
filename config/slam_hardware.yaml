@@ -17,12 +17,14 @@ slam_toolbox:
     # IMPORTANT: real hardware uses wall clock, NOT simulation time
     use_sim_time: false
 
-    # TF Frames — must match exactly:
-    #   map → odom         (published by slam_toolbox itself)
-    #   odom → base_footprint  (published by visual_odometry_node.py)
+    # TF Frames:
+    #   map → base_footprint   (published by slam_toolbox — no odom needed)
     #   base_footprint → base_link  (static TF in hw_robot_state.launch.py)
     #   base_link → laser  (static TF in hw_robot_state.launch.py)
-    odom_frame: odom
+    #
+    # Setting odom_frame == base_frame removes the odom TF dependency.
+    # SLAM scan-matching handles positioning directly.
+    odom_frame: base_footprint
     map_frame: map
     base_frame: base_footprint
     scan_topic: /scan
@@ -36,16 +38,17 @@ slam_toolbox:
     map_update_interval: 2.0
     resolution: 0.05
     max_laser_range: 12.0
-    minimum_time_interval: 0.5
-    transform_timeout: 0.5
-    tf_buffer_duration: 30.0
+    minimum_time_interval: 0.3
+    transform_timeout: 1.0
+    tf_buffer_duration: 60.0
     stack_size_to_use: 40000000
     enable_interactive_mode: true
 
     use_scan_matching: true
     use_scan_barycenter: true
-    minimum_travel_distance: 0.1   # add scan every 10cm (finer map for small car)
-    minimum_travel_heading: 0.17   # add scan every ~10 degrees
+    minimum_travel_distance: 0.0   # 0 = process every scan (no odom source, can't measure travel)
+    minimum_travel_heading: 0.0    # 0 = process every scan regardless of rotation
+    minimum_time_interval: 0.3     # but limit to max 1 scan per 0.3s to avoid overload
     scan_buffer_size: 10
     scan_buffer_maximum_scan_distance: 10.0
     link_match_minimum_response_fine: 0.1

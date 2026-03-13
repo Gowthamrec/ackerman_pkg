@@ -19,7 +19,7 @@ slam_toolbox:
     # if you'd like to immediately start continuing a map at a given pose
     # or at the dock, but they are mutually exclusive, if pose is given
     # will use pose
-    map_file_name: /home/ros2/car_project_ws/src/ackerman_pkg/map/my_map
+    map_file_name: /home/surjith/car_project/src/ackerman_pkg/map/my_map
     # map_start_pose: [0.0, 0.0, 0.0]
     map_start_at_dock: true
 

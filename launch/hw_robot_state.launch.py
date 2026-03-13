@@ -92,7 +92,7 @@ def generate_launch_description():
         output='screen',
         parameters=[{
             'camera_topic': '/image',
-            'publish_tf': 'true',     # MUST be true on hardware (no Gazebo)
+            'publish_tf': 'false',    # false: odom_frame==base_frame in SLAM, TF not needed
             'camera_fx': '500.0',     # ← replace with your calibrated value
             'camera_fy': '500.0',     # ← replace with your calibrated value
             'camera_cx': '320.0',     # ← image_width / 2  (640/2)

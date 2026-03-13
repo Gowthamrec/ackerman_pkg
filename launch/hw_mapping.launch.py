@@ -13,7 +13,7 @@ Includes:
 
 After mapping, save the map:
   ros2 run nav2_map_server map_saver_cli \
-    -f ~/car_project_ws/src/ackerman_pkg/map/my_map
+        -f /home/surjith/car_project/src/ackerman_pkg/map/my_map
 
 Usage:
   ros2 launch ackerman_pkg hw_mapping.launch.py
@@ -25,6 +25,7 @@ from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription, LogInfo, DeclareLaunchArgument
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
 
 
@@ -40,8 +41,13 @@ def generate_launch_description():
     )
     camera_device_arg = DeclareLaunchArgument(
         'camera_device',
-        default_value='/dev/video0',
+        default_value='/dev/video2',
         description='USB webcam device'
+    )
+    arduino_port_arg = DeclareLaunchArgument(
+        'arduino_port',
+        default_value='/dev/ttyACM0',
+        description='USB port for Arduino Mega motor controller'
     )
 
     robot_state = IncludeLaunchDescription(
@@ -74,6 +80,28 @@ def generate_launch_description():
         )
     )
 
+    # Relay /cmd_vel → /cmd_vel_safe (skip obstacle_manager during mapping)
+    cmd_vel_relay = Node(
+        package='topic_tools',
+        executable='relay',
+        name='cmd_vel_relay',
+        arguments=['/cmd_vel', '/cmd_vel_safe'],
+        output='screen',
+    )
+
+    # Arduino bridge — translates /cmd_vel_safe → serial commands to motors
+    arduino_bridge = Node(
+        package='ackerman_pkg',
+        executable='arduino_bridge_node.py',
+        name='arduino_bridge_node',
+        output='screen',
+        parameters=[{
+            'serial_port': LaunchConfiguration('arduino_port'),
+            'baud_rate': '115200',
+            'use_sim_time': False,
+        }]
+    )
+
     banner = LogInfo(msg=[
         '\n',
         '=======================================================\n',
@@ -82,6 +110,7 @@ def generate_launch_description():
         '  Odometry source : Visual Odometry (camera)\n',
         '  LiDAR port      : ', LaunchConfiguration('serial_port'), '\n',
         '  Camera device   : ', LaunchConfiguration('camera_device'), '\n',
+        '  Arduino port    : ', LaunchConfiguration('arduino_port'), '\n',
         '-------------------------------------------------------\n',
         '  Drive with: ros2 run teleop_twist_keyboard teleop_twist_keyboard\n',
         '  In RViz: Fixed Frame = map, add Map topic = /map\n',
@@ -89,16 +118,19 @@ def generate_launch_description():
         '-------------------------------------------------------\n',
         '  Save map when done:\n',
         '  ros2 run nav2_map_server map_saver_cli \\\n',
-        '    -f ~/car_project_ws/src/ackerman_pkg/map/my_map\n',
+        '    -f /home/surjith/car_project/src/ackerman_pkg/map/my_map\n',
         '=======================================================\n',
     ])
 
     return LaunchDescription([
         serial_port_arg,
         camera_device_arg,
+        arduino_port_arg,
         banner,
         robot_state,   # TF tree + visual odom
         lidar,         # /scan
         camera,        # /image
         slam,          # map building
+        cmd_vel_relay, # /cmd_vel → /cmd_vel_safe
+        arduino_bridge,# serial motor commands
     ])

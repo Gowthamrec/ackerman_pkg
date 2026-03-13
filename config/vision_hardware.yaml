@@ -2,7 +2,7 @@
 
 # Hardware Camera Parameters
 hardware:
-  camera_topic: /dev/video0      # USB camera device
+  camera_topic: /dev/video2      # USB camera device
   frame_rate: 30                  # Real camera FPS
   enable_visualization: true      # Show processed images
   image_width: 640

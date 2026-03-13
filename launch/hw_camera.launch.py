@@ -24,7 +24,7 @@ def generate_launch_description():
 
     device_arg = DeclareLaunchArgument(
         'camera_device',
-        default_value='/dev/video0',
+        default_value='/dev/video2',
         description='Video device for USB webcam'
     )
     width_arg = DeclareLaunchArgument(
@@ -39,7 +39,7 @@ def generate_launch_description():
     )
     fps_arg = DeclareLaunchArgument(
         'framerate',
-        default_value='30',
+        default_value='30.0',
         description='Camera framerate'
     )
 

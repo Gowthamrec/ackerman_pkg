@@ -77,6 +77,7 @@ class ArduinoBridgeNode(Node):
         self.connected = False
         self.last_speed_pwm = 0
         self.last_steer_pwm = self.steer_center
+        self.last_connect_attempt = 0.0  # epoch seconds of last retry
 
         # ── Subscribers ──
         # Reads from obstacle_manager output (safest velocity)
@@ -199,13 +200,17 @@ class ArduinoBridgeNode(Node):
         now = self.get_clock().now()
         elapsed = (now - self.last_cmd_time).nanoseconds / 1e9
         if elapsed > self.cmd_timeout:
-            self._send_stop()
-            self.get_logger().warn(
-                f'Watchdog: no cmd_vel for {elapsed:.1f}s → STOP', throttle_duration_sec=2.0)
+            if self.connected:
+                self._send_stop()
+                self.get_logger().warn(
+                    f'Watchdog: no cmd_vel for {elapsed:.1f}s → STOP', throttle_duration_sec=2.0)
 
-        # Try reconnect if disconnected
+        # Try reconnect if disconnected — throttled to once every 5 seconds
         if not self.connected:
-            self._connect_serial()
+            now_sec = time.time()
+            if now_sec - self.last_connect_attempt >= 5.0:
+                self.last_connect_attempt = now_sec
+                self._connect_serial()
 
     def _publish_status(self):
         """Publish connection status."""

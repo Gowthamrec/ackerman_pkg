@@ -11,7 +11,7 @@ Prerequisites (run first):
 
 Usage:
   ros2 launch ackerman_pkg hw_localization.launch.py \
-    map:=/home/ros2/car_project_ws/src/ackerman_pkg/map/my_map.yaml
+        map:=/home/surjith/car_project/src/ackerman_pkg/map/my_map.yaml
 """
 
 import os
