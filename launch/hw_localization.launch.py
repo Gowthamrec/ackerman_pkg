@@ -25,7 +25,7 @@ from ament_index_python.packages import get_package_share_directory
 def generate_launch_description():
 
     pkg_dir = get_package_share_directory('ackerman_pkg')
-    default_map = os.path.join(pkg_dir, 'map', 'my_map.yaml')
+    default_map = '/home/surjith/car_project/src/final_year_pkg/map/test_map1.yaml'
     default_nav2_params = os.path.join(pkg_dir, 'config', 'nav2.yaml')
 
     map_arg = DeclareLaunchArgument(
